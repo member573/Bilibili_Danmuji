@@ -16,6 +16,7 @@ import xyz.acproject.danmuji.conf.CenterSetConf;
 import xyz.acproject.danmuji.conf.PublicDataConf;
 import xyz.acproject.danmuji.conf.set.*;
 import xyz.acproject.danmuji.entity.base.Response;
+import xyz.acproject.danmuji.entity.blindbox.BlindBoxProfitSummary;
 import xyz.acproject.danmuji.entity.login_data.LoginData;
 import xyz.acproject.danmuji.entity.login_data.Qrcode;
 import xyz.acproject.danmuji.entity.other.EditionResult;
@@ -27,6 +28,7 @@ import xyz.acproject.danmuji.http.HttpUserData;
 import xyz.acproject.danmuji.service.ClientService;
 import xyz.acproject.danmuji.service.DanmujiInitService;
 import xyz.acproject.danmuji.service.SetService;
+import xyz.acproject.danmuji.service.BlindBoxRecordService;
 import xyz.acproject.danmuji.tools.CurrencyTools;
 import xyz.acproject.danmuji.tools.ParseSetStatusTools;
 import xyz.acproject.danmuji.tools.file.JsonFileTools;
@@ -56,6 +58,8 @@ public class WebController {
     private ClientService clientService;
     @Resource
     private DanmujiInitService danmujiInitService;
+    @Resource
+    private BlindBoxRecordService blindBoxRecordService;
     private TaskRegisterComponent taskRegisterComponent;
     private static final Logger LOGGER = LogManager.getLogger(WebController.class);
 
@@ -224,6 +228,35 @@ public class WebController {
     @GetMapping(value = "/heartBeat")
     public Response<?> heartBeat(HttpServletRequest req) {
         return Response.success(PublicDataConf.ROOM_POPULARITY, req);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/blindBox/userProfit")
+    public Response<?> blindBoxUserProfit(HttpServletRequest req,
+                                          @RequestParam(value = "uid", required = false) Long uid,
+                                          @RequestParam(value = "roomid", required = false) Long roomid) {
+        Long fixedUid = uid;
+        if ((fixedUid == null || fixedUid <= 0) && PublicDataConf.USER != null) {
+            fixedUid = PublicDataConf.USER.getUid();
+        }
+        Long fixedRoomId = roomid;
+        if (fixedRoomId == null || fixedRoomId <= 0) {
+            fixedRoomId = PublicDataConf.ROOMID;
+        }
+        BlindBoxProfitSummary summary = blindBoxRecordService.queryUserLastThreeMonths(fixedUid, fixedRoomId);
+        return Response.success(summary, req);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/blindBox/roomProfit")
+    public Response<?> blindBoxRoomProfit(HttpServletRequest req,
+                                          @RequestParam(value = "roomid", required = false) Long roomid) {
+        Long fixedRoomId = roomid;
+        if (fixedRoomId == null || fixedRoomId <= 0) {
+            fixedRoomId = PublicDataConf.ROOMID;
+        }
+        BlindBoxProfitSummary summary = blindBoxRecordService.queryRoomLastThreeMonths(fixedRoomId);
+        return Response.success(summary, req);
     }
 
 

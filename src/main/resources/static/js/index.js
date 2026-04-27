@@ -34,6 +34,7 @@ $(function () {
         method.importDfFile();
     });
     publicData.set = method.initSet(method.getSet());
+    method.refreshBlindBoxStats();
     $('.thankgift_thank_status')
         .change(
             function () {
@@ -505,6 +506,9 @@ $(document).on('click', '#checkupdate', function () {
             $(".tips-wrap").hide();
         }, 1000)
     });
+});
+$(document).on('click', '.blindbox-refresh', function () {
+    method.refreshBlindBoxStats();
 });
 $(document).on('click', '.room-manager', function (e) {
     $(".wel-mask").show();
@@ -1007,6 +1011,52 @@ const method = {
             }
         });
         return json;
+    },
+    getBlindBoxUserProfit: function () {
+        let summary = null;
+        $.ajax({
+            url: '../blindBox/userProfit',
+            async: false,
+            cache: false,
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                if (data.code == "200") {
+                    summary = data.result;
+                }
+            }
+        });
+        return summary;
+    },
+    getBlindBoxRoomProfit: function () {
+        let summary = null;
+        $.ajax({
+            url: '../blindBox/roomProfit',
+            async: false,
+            cache: false,
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                if (data.code == "200") {
+                    summary = data.result;
+                }
+            }
+        });
+        return summary;
+    },
+    blindBoxSummaryText: function (summary) {
+        if (summary == null) {
+            return "成本: 0 金仓鼠，回报: 0 金仓鼠，盈亏: 0 金仓鼠，盲盒数: 0";
+        }
+        let cost = summary.totalCostCoin == null ? 0 : summary.totalCostCoin;
+        let reward = summary.totalRewardCoin == null ? 0 : summary.totalRewardCoin;
+        let profit = summary.totalProfitCoin == null ? 0 : summary.totalProfitCoin;
+        let count = summary.totalCount == null ? 0 : summary.totalCount;
+        return "成本: " + cost + " 金仓鼠，回报: " + reward + " 金仓鼠，盈亏: " + profit + " 金仓鼠，盲盒数: " + count;
+    },
+    refreshBlindBoxStats: function () {
+        let roomSummary = method.getBlindBoxRoomProfit();
+        $(".blindbox-room-summary").text(method.blindBoxSummaryText(roomSummary));
     },
     sendSet: function (set) {
         "use strict";

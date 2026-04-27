@@ -19,6 +19,7 @@ import xyz.acproject.danmuji.entity.Welcome.WelcomeGuard;
 import xyz.acproject.danmuji.entity.Welcome.WelcomeVip;
 import xyz.acproject.danmuji.entity.auto_reply.AutoReply;
 import xyz.acproject.danmuji.entity.base.WsPackage;
+import xyz.acproject.danmuji.entity.blindbox.BlindBoxProfitSummary;
 import xyz.acproject.danmuji.entity.danmu_data.*;
 import xyz.acproject.danmuji.entity.high_level_danmu.Hbarrage;
 import xyz.acproject.danmuji.entity.interactWordV2.INTERACTWORDV2;
@@ -28,6 +29,7 @@ import xyz.acproject.danmuji.entity.superchat.SuperChat;
 import xyz.acproject.danmuji.enums.ListPeopleShieldStatus;
 import xyz.acproject.danmuji.enums.ShieldGift;
 import xyz.acproject.danmuji.http.HttpUserData;
+import xyz.acproject.danmuji.service.BlindBoxRecordService;
 import xyz.acproject.danmuji.service.SetService;
 import xyz.acproject.danmuji.tools.CurrencyTools;
 import xyz.acproject.danmuji.tools.ParseIndentityTools;
@@ -39,6 +41,8 @@ import xyz.acproject.danmuji.utils.SpringUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author BanqiJane
@@ -52,11 +56,13 @@ public class ParseMessageThread extends Thread {
     public volatile boolean FLAG = false;
     private DanmuWebsocket danmuWebsocket = SpringUtils.getBean(DanmuWebsocket.class);
     private SetService setService = SpringUtils.getBean(SetService.class);
+    private BlindBoxRecordService blindBoxRecordService = SpringUtils.getBean(BlindBoxRecordService.class);
 
     private BlackParseComponent blackParseComponent = SpringUtils.getBean(BlackParseComponent.class);
     private ThreadComponent threadComponent = SpringUtils.getBean(ThreadComponent.class);
     private HashSet<ThankGiftRuleSet> thankGiftRuleSets;
     private CenterSetConf centerSetConf;
+    private static final Pattern MONTH_BLIND_BOX_COMMAND = Pattern.compile("^([1-9]|1[0-2])月盲盒$");
 
 
     @Override
@@ -161,6 +167,8 @@ public class ParseMessageThread extends Thread {
                                 if (barrage.getMedal_room() != (long) PublicDataConf.ROOMID) is_xunzhang = false;
                             }
                             //{"cmd":"DANMU_MSG","dm_v2":"CiIwMTc0ZjQzZjhiZjgyMjE3MjJlMjA2MWNmYjY0YWQzMjU3EAEYGSDeg+MCKghmMTYyNGY0MzID6LWeOLCOu6SUMUiWlLPq+P////8BYgBoAXJnCgPotZ4SYAoMb2ZmaWNpYWxfMTQ3EklodHRwOi8vaTAuaGRzbGIuY29tL2Jmcy9saXZlL2JiZDkwNDU1NzBkMGMwMjJhOTg0YzYzN2U0MDZjYjBlMWYyMDhhYTkucG5nIAEwPDiWAYoBAJoBEAoIRTYwNkY4NzQQ4+W0pQaiAaEBCO2DhBMSD+iAs+S4nOeri+S5oOS5oCJLaHR0cHM6Ly9pMS5oZHNsYi5jb20vYmZzL2ZhY2UvNTU1MGQ0NTQyY2NhNjkxNzYzZjdhMTNhZTUzMDIzNDE3NTNiMDJiYy53ZWJwOJBOQAFaIAgUEgbliLrlhL8gpLqeBjCkup4GOKS6ngZApLqeBlABYg8IHxDx0YEFGgY+NTAwMDBqAHIAegCqARUIlqUKEgzpgI3pgaXmlaPkuroYhQg=","info":[[0,1,25,5816798,1689072355120,-1924347370,0,"f1624f43",0,0,0,"",1,{"bulge_display":0,"emoticon_unique":"official_147","height":60,"in_player_area":1,"is_dynamic":0,"url":"http://i0.hdslb.com/bfs/live/bbd9045570d0c022a984c637e406cb0e1f208aa9.png","width":150},"{}",{"extra":"{\"send_from_me\":false,\"mode\":0,\"color\":5816798,\"dm_type\":1,\"font_size\":25,\"player_mode\":1,\"show_player_type\":0,\"content\":\"赞\",\"user_hash\":\"4049751875\",\"emoticon_unique\":\"official_147\",\"bulge_display\":0,\"recommend_score\":0,\"main_state_dm_color\":\"\",\"objective_state_dm_color\":\"\",\"direction\":0,\"pk_direction\":0,\"quartet_direction\":0,\"anniversary_crowd\":0,\"yeah_space_type\":\"\",\"yeah_space_url\":\"\",\"jump_to_url\":\"\",\"space_type\":\"\",\"space_url\":\"\",\"animation\":{},\"emots\":null,\"is_audited\":false,\"id_str\":\"0174f43f8bf8221722e2061cfb64ad3257\",\"icon\":null}","mode":0,"show_player_type":0},{"activity_identity":"","activity_source":0,"not_show":0},0],"赞",[39911917,"耳东立习习",0,0,0,10000,1,""],[20,"刺儿","逍遥散人",1017,13081892,"",0,13081892,13081892,13081892,0,1,168598],[31,0,10512625,"\u003e50000",0],["",""],0,0,null,{"ct":"E606F874","ts":1689072355},0,0,null,null,0,56,[0]],"is_report":false,"msg_id":"271830315699712","send_time":1689072355181}
+                            // 盲盒统计命令独立处理，避免受展示过滤条件影响
+                            handleBlindBoxSummaryCommand(barrage);
                             // 过滤礼物自动弹幕 & 可能非主播勋章弹幕
                             if (barrage.getMsg_type() == 0 && is_xunzhang) {
                                 //是否开启弹幕
@@ -262,6 +270,7 @@ public class ParseMessageThread extends Thread {
                         // 送普通礼物
                         case "SEND_GIFT":
                             jsonObject = JSONObject.parseObject(jsonObject.getString("data"));
+                            blindBoxRecordService.recordBlindBoxGift(jsonObject, PublicDataConf.ROOMID, PublicDataConf.AUID);
                             short gift_type = ParseIndentityTools.parseCoin_type(jsonObject.getString("coin_type"));
                             gift = Gift.getGift(jsonObject.getInteger("giftId"), jsonObject.getShort("giftType"),
                                     jsonObject.getString("giftName"), jsonObject.getInteger("num"),
@@ -1586,6 +1595,59 @@ public class ParseMessageThread extends Thread {
         }
         //黑名单
         return blackParseComponent.autoReplay_parse(AutoReply.getAutoReply(barrage.getUid(), barrage.getUname(), barrage.getMsg()));
+    }
+
+    private void handleBlindBoxSummaryCommand(Barrage barrage) {
+        if (barrage == null || StringUtils.isBlank(barrage.getMsg())) {
+            return;
+        }
+        String msg = barrage.getMsg().trim();
+        boolean isRollingThreeMonth = StringUtils.equals("近3月盲盒", msg);
+        Matcher monthMatcher = MONTH_BLIND_BOX_COMMAND.matcher(msg);
+        boolean isMonthCommand = monthMatcher.matches();
+        if (!isRollingThreeMonth && !isMonthCommand) {
+            return;
+        }
+        if (PublicDataConf.sendBarrageThread == null || PublicDataConf.sendBarrageThread.FLAG) {
+            return;
+        }
+
+        String reply;
+        if (isRollingThreeMonth) {
+            if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
+                BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomLastThreeMonths(PublicDataConf.ROOMID);
+                reply = "近3月盲盒汇总 成本" + roomSummary.getTotalCostCoin()
+                        + " 回报" + roomSummary.getTotalRewardCoin()
+                        + " 盈亏" + roomSummary.getTotalProfitCoin()
+                        + " 次" + roomSummary.getTotalCount();
+            } else {
+                BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserLastThreeMonths(barrage.getUid(), PublicDataConf.ROOMID);
+                reply = "@" + barrage.getUname() + " 近3月盲盒 成本" + userSummary.getTotalCostCoin()
+                        + " 回报" + userSummary.getTotalRewardCoin()
+                        + " 盈亏" + userSummary.getTotalProfitCoin()
+                        + " 次" + userSummary.getTotalCount();
+            }
+        } else {
+            int month = Integer.parseInt(monthMatcher.group(1));
+            int year = Calendar.getInstance().get(Calendar.YEAR);
+            if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
+                BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomByMonth(PublicDataConf.ROOMID, year, month);
+                reply = month + "月盲盒汇总 成本" + roomSummary.getTotalCostCoin()
+                        + " 回报" + roomSummary.getTotalRewardCoin()
+                        + " 盈亏" + roomSummary.getTotalProfitCoin()
+                        + " 次" + roomSummary.getTotalCount();
+            } else {
+                BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserByMonth(barrage.getUid(), PublicDataConf.ROOMID, year, month);
+                reply = "@" + barrage.getUname() + " " + month + "月盲盒 成本" + userSummary.getTotalCostCoin()
+                        + " 回报" + userSummary.getTotalRewardCoin()
+                        + " 盈亏" + userSummary.getTotalProfitCoin()
+                        + " 次" + userSummary.getTotalCount();
+            }
+        }
+        PublicDataConf.barrageString.add(reply);
+        synchronized (PublicDataConf.sendBarrageThread) {
+            PublicDataConf.sendBarrageThread.notify();
+        }
     }
 
 

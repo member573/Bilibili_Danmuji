@@ -53,6 +53,8 @@ dependencies {
 	implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '4.31.1'
 	// https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java-util
 	implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: '4.31.1'
+	// https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc
+	implementation group: 'org.xerial', name: 'sqlite-jdbc'
 	implementation fileTree(dir: 'lib', includes: ['*.jar'])
 }
 configurations {

@@ -60,16 +60,15 @@ public class SendBarrageThread extends Thread {
 
                     if (!PublicDataConf.centerSetConf.isTest_mode()) {
                         try {
-                            // TODO 自动生成的方法存根
-                            HttpUserData.httpPostSendBarrage(barrageStr);
-
+                            Short sendCode = HttpUserData.httpPostSendBarrage(barrageStr);
+                            if (sendCode == null || sendCode != 0) {
+                                LOGGER.error("发送弹幕失败，code={}, content={}", sendCode, barrageStr);
+                            }
                         } catch (Exception e) {
-//							LOGGER.error("发送弹幕线程抛出v:" + e);
-                            // TODO: handle exception
+                            LOGGER.error("发送弹幕线程抛出异常, content={}", barrageStr, e);
                         }
-//
                     } else {
-                        LOGGER.info(barrageStr);
+                        LOGGER.info("[test_mode] 未实际发送弹幕，仅日志输出:{}", barrageStr);
                     }
                 }
                 PublicDataConf.barrageString.remove(0);
