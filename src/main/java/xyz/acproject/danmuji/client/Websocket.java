@@ -55,9 +55,17 @@ public class Websocket extends WebSocketClient {
 	@Override
 	public void onClose(int code, String reason, boolean remote) {
 		// TODO 自动生成的方法存根
-		LOGGER.info("websocket connect close(连接已经断开)，纠错码:" + code);
-		PublicDataConf.heartByteThread.HFLAG = true;
-		PublicDataConf.parseMessageThread.FLAG = true;
+		long sinceHeartbeat = PublicDataConf.LAST_WS_HEARTBEAT_AT > 0
+				? System.currentTimeMillis() - PublicDataConf.LAST_WS_HEARTBEAT_AT
+				: -1L;
+		LOGGER.info("websocket connect close(连接已经断开)，纠错码:" + code
+				+ ";原因:" + reason + ";remote:" + remote + ";距上次心跳(ms):" + sinceHeartbeat);
+		if (PublicDataConf.heartByteThread != null) {
+			PublicDataConf.heartByteThread.HFLAG = true;
+		}
+		if (PublicDataConf.parseMessageThread != null) {
+			PublicDataConf.parseMessageThread.FLAG = true;
+		}
 		if (code != 1000) {
 			LOGGER.info("websocket connect close(连接意外断开，正在尝试重连)，错误码:" + code);
 			if (!PublicDataConf.webSocketProxy.isOpen()) {
@@ -81,7 +89,11 @@ public class Websocket extends WebSocketClient {
 	@Override
 	public void onError(Exception ex) {
 		// TODO 自动生成的方法存根
-		LOGGER.error("[错误信息，请将log文件下的日志发送给管理员]websocket connect error,message:" + ex.getMessage());
+		long sinceHeartbeat = PublicDataConf.LAST_WS_HEARTBEAT_AT > 0
+				? System.currentTimeMillis() - PublicDataConf.LAST_WS_HEARTBEAT_AT
+				: -1L;
+		LOGGER.error("[错误信息，请将log文件下的日志发送给管理员]websocket connect error,message:" + ex.getMessage()
+				+ ";距上次心跳(ms):" + sinceHeartbeat, ex);
 		LOGGER.info("尝试重新链接");
 		synchronized (PublicDataConf.webSocketProxy) {
 			PublicDataConf.webSocketProxy.close(1006);

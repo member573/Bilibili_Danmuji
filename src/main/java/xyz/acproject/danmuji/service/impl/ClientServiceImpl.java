@@ -21,7 +21,6 @@ import xyz.acproject.danmuji.service.SetService;
 import xyz.acproject.danmuji.tools.CurrencyTools;
 import xyz.acproject.danmuji.tools.file.GuardFileTools;
 import xyz.acproject.danmuji.utils.ByteUtils;
-import xyz.acproject.danmuji.utils.HexUtils;
 import xyz.acproject.danmuji.utils.WbiSignUtils;
 import xyz.acproject.danmuji.ws.HandleWebsocketPackage;
 
@@ -103,7 +102,8 @@ public class ClientServiceImpl implements ClientService {
         //开启websocket 和 发送验证包和心跳包
         PublicDataConf.webSocketProxy = new WebSocketProxy(PublicDataConf.URL, room);
         PublicDataConf.webSocketProxy.send(req);
-        PublicDataConf.webSocketProxy.send(HexUtils.fromHexString(PublicDataConf.heartByte));
+        PublicDataConf.webSocketProxy.send(CurrencyTools.heartBytes());
+        PublicDataConf.LAST_WS_HEARTBEAT_AT = System.currentTimeMillis();
         threadComponent.startHeartByteThread();
         setService.holdSet(PublicDataConf.centerSetConf);
         //检查红包+天选
@@ -244,7 +244,8 @@ public class ClientServiceImpl implements ClientService {
             byte[] byte_2 = fristSecurityData.toJson().getBytes();
             byte[] req = ByteUtils.byteMerger(byte_1, byte_2);
             PublicDataConf.webSocketProxy.send(req);
-            PublicDataConf.webSocketProxy.send(HexUtils.fromHexString(PublicDataConf.heartByte));
+            PublicDataConf.webSocketProxy.send(CurrencyTools.heartBytes());
+            PublicDataConf.LAST_WS_HEARTBEAT_AT = System.currentTimeMillis();
             threadComponent.startHeartByteThread();
             if (PublicDataConf.webSocketProxy.isOpen()) {
                 setService.holdSet(PublicDataConf.centerSetConf);

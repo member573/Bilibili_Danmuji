@@ -2,7 +2,7 @@ package xyz.acproject.danmuji.thread.core;
 
 
 import xyz.acproject.danmuji.conf.PublicDataConf;
-import xyz.acproject.danmuji.utils.HexUtils;
+import xyz.acproject.danmuji.tools.CurrencyTools;
 
 /**
  * @ClassName HeartByteThread
@@ -32,14 +32,21 @@ public class HeartByteThread extends Thread {
 			if (HFLAG) {
 				return;
 			}
-			if(PublicDataConf.webSocketProxy.isOpen()) {
+			if (PublicDataConf.webSocketProxy != null && PublicDataConf.webSocketProxy.isOpen()) {
 				try {
 					Thread.sleep(30000);
-					PublicDataConf.webSocketProxy.send(HexUtils.fromHexString(PublicDataConf.heartByte));
+					PublicDataConf.webSocketProxy.send(CurrencyTools.heartBytes());
+					PublicDataConf.LAST_WS_HEARTBEAT_AT = System.currentTimeMillis();
 				} catch (Exception e) {
 					// TODO: handle exception
 //					LOGGER.info("心跳线程关闭:"+e);
 //					e.printStackTrace();
+				}
+			} else {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {
+					return;
 				}
 			}
 			

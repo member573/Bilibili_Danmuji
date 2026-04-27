@@ -23,6 +23,8 @@ public class WebSocketProxy extends Websocket {
 		LOGGER.info("Connectin(连接中)...........................................");
 		// TODO 自动生成的构造函数存根
 		super.connectBlocking();
+		// 业务层自己维护心跳，关闭库内置丢线检测，避免误判导致固定周期断开
+		super.setConnectionLostTimeout(0);
 		LOGGER.info("Connecting Success(连接成功)");
 	}
 

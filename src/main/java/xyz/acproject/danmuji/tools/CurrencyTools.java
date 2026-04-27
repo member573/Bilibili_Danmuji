@@ -97,11 +97,13 @@ public class CurrencyTools {
      * @return
      */
     public static byte[] heartBytes() {
+        // B站直播弹幕历史协议心跳包体
+        byte[] body = "[object Object]".getBytes();
         return ByteUtils.byteMerger(
                 HandleWebsocketPackage.BEhandle(BarrageHeadHandle.getBarrageHeadHandle(
-                        "[object Object]".getBytes().length + 16, PublicDataConf.packageHeadLength,
+                        body.length + 16, PublicDataConf.packageHeadLength,
                         PublicDataConf.packageVersion, PublicDataConf.heartPackageType, PublicDataConf.packageOther)),
-                "[object Object]".getBytes());
+                body);
     }
 
     /**

@@ -78,8 +78,10 @@ public class PublicDataConf {
 
 	
 	
-	//心跳包 16进制
-	public final static String heartByte="0000001f0010000100000002000000015b6f626a656374204f626a6563745d";
+	// 心跳包16进制（B站直播弹幕常用历史协议体：[object Object]）
+	public final static String heartByte = "0000001f0010000100000002000000015b6f626a656374204f626a6563745d";
+	// 最近一次发送websocket心跳的毫秒时间戳
+	public static volatile long LAST_WS_HEARTBEAT_AT = 0L;
 	//包头长
 	public final static char packageHeadLength = 16;
 	//验证包协议类型
