@@ -39,6 +39,8 @@ import xyz.acproject.danmuji.tools.file.GuardFileTools;
 import xyz.acproject.danmuji.utils.JodaTimeUtils;
 import xyz.acproject.danmuji.utils.SpringUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -270,7 +272,19 @@ public class ParseMessageThread extends Thread {
                         // 送普通礼物
                         case "SEND_GIFT":
                             jsonObject = JSONObject.parseObject(jsonObject.getString("data"));
-                            blindBoxRecordService.recordBlindBoxGift(jsonObject, PublicDataConf.ROOMID, PublicDataConf.AUID);
+                            BlindBoxProfitSummary currentBlindBoxSummary =
+                                    blindBoxRecordService.recordBlindBoxGift(jsonObject, PublicDataConf.ROOMID, PublicDataConf.AUID);
+                            if (currentBlindBoxSummary != null
+                                    && PublicDataConf.sendBarrageThread != null
+                                    && !PublicDataConf.sendBarrageThread.FLAG) {
+                                String currentBlindBoxReply = "本次投喂盲盒"
+                                        + safeCount(currentBlindBoxSummary) + "个，"
+                                        + profitText(currentBlindBoxSummary.getTotalProfitCoin()) + "。";
+                                PublicDataConf.barrageString.add(currentBlindBoxReply);
+                                synchronized (PublicDataConf.sendBarrageThread) {
+                                    PublicDataConf.sendBarrageThread.notify();
+                                }
+                            }
                             short gift_type = ParseIndentityTools.parseCoin_type(jsonObject.getString("coin_type"));
                             gift = Gift.getGift(jsonObject.getInteger("giftId"), jsonObject.getShort("giftType"),
                                     jsonObject.getString("giftName"), jsonObject.getInteger("num"),
@@ -1616,38 +1630,53 @@ public class ParseMessageThread extends Thread {
         if (isRollingThreeMonth) {
             if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
                 BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomLastThreeMonths(PublicDataConf.ROOMID);
-                reply = "近3月盲盒汇总 成本" + roomSummary.getTotalCostCoin()
-                        + " 回报" + roomSummary.getTotalRewardCoin()
-                        + " 盈亏" + roomSummary.getTotalProfitCoin()
-                        + " 次" + roomSummary.getTotalCount();
+                reply = "近3月盲盒 共投喂" + safeCount(roomSummary)
+                        + "个盲盒，" + profitText(roomSummary.getTotalProfitCoin()) + "。";
             } else {
                 BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserLastThreeMonths(barrage.getUid(), PublicDataConf.ROOMID);
-                reply = "@" + barrage.getUname() + " 近3月盲盒 成本" + userSummary.getTotalCostCoin()
-                        + " 回报" + userSummary.getTotalRewardCoin()
-                        + " 盈亏" + userSummary.getTotalProfitCoin()
-                        + " 次" + userSummary.getTotalCount();
+                reply = "@" + barrage.getUname() + " 近3月盲盒 共投喂" + safeCount(userSummary)
+                        + "个盲盒，" + profitText(userSummary.getTotalProfitCoin()) + "。";
             }
         } else {
             int month = Integer.parseInt(monthMatcher.group(1));
             int year = Calendar.getInstance().get(Calendar.YEAR);
             if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
                 BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomByMonth(PublicDataConf.ROOMID, year, month);
-                reply = month + "月盲盒汇总 成本" + roomSummary.getTotalCostCoin()
-                        + " 回报" + roomSummary.getTotalRewardCoin()
-                        + " 盈亏" + roomSummary.getTotalProfitCoin()
-                        + " 次" + roomSummary.getTotalCount();
+                reply = month + "月盲盒 共投喂" + safeCount(roomSummary)
+                        + "个盲盒，" + profitText(roomSummary.getTotalProfitCoin()) + "。";
             } else {
                 BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserByMonth(barrage.getUid(), PublicDataConf.ROOMID, year, month);
-                reply = "@" + barrage.getUname() + " " + month + "月盲盒 成本" + userSummary.getTotalCostCoin()
-                        + " 回报" + userSummary.getTotalRewardCoin()
-                        + " 盈亏" + userSummary.getTotalProfitCoin()
-                        + " 次" + userSummary.getTotalCount();
+                reply = "@" + barrage.getUname() + " " + month + "月盲盒 共投喂" + safeCount(userSummary)
+                        + "个盲盒，" + profitText(userSummary.getTotalProfitCoin()) + "。";
             }
         }
         PublicDataConf.barrageString.add(reply);
         synchronized (PublicDataConf.sendBarrageThread) {
             PublicDataConf.sendBarrageThread.notify();
         }
+    }
+
+    private long safeCount(BlindBoxProfitSummary summary) {
+        return summary == null || summary.getTotalCount() == null ? 0L : summary.getTotalCount();
+    }
+
+    private String coinToYuanText(Long coin) {
+        long value = coin == null ? 0L : coin;
+        BigDecimal yuan = BigDecimal.valueOf(value)
+                .divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP)
+                .stripTrailingZeros();
+        return yuan.toPlainString();
+    }
+
+    private String profitText(Long profitCoin) {
+        long value = profitCoin == null ? 0L : profitCoin;
+        if (value > 0) {
+            return "赚了" + coinToYuanText(value) + "元";
+        }
+        if (value < 0) {
+            return "亏了" + coinToYuanText(-value) + "元";
+        }
+        return "不赚不亏";
     }
 
 

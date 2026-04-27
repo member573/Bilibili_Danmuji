@@ -53,13 +53,13 @@ public class BlindBoxRecordService {
         }
     }
 
-    public void recordBlindBoxGift(JSONObject data, Long roomId, Long anchorUid) {
+    public BlindBoxProfitSummary recordBlindBoxGift(JSONObject data, Long roomId, Long anchorUid) {
         if (data == null) {
-            return;
+            return null;
         }
         JSONObject blindGift = data.getJSONObject("blind_gift");
         if (blindGift == null) {
-            return;
+            return null;
         }
         
         LOGGER.debug("盲盒原始字段 blind_gift={}, uid={}, roomId={}",
@@ -69,7 +69,7 @@ public class BlindBoxRecordService {
         
         long senderUid = data.getLongValue("uid");
         if (senderUid <= 0) {
-            return;
+            return null;
         }
         int num = positiveInt(data.getInteger("num"), 1);
         long costCoin = data.getLongValue("total_coin");
@@ -125,6 +125,14 @@ public class BlindBoxRecordService {
         } catch (Exception e) {
             LOGGER.error("写入盲盒记录失败, data={}", data, e);
         }
+        BlindBoxProfitSummary summary = new BlindBoxProfitSummary();
+        summary.setRoomId(fixedRoomId);
+        summary.setUid(senderUid);
+        summary.setTotalCostCoin(costCoin);
+        summary.setTotalRewardCoin(rewardCoin);
+        summary.setTotalProfitCoin(profitCoin);
+        summary.setTotalCount((long) num);
+        return summary;
     }
 
     public BlindBoxProfitSummary queryUserLastThreeMonths(Long uid, Long roomId) {
