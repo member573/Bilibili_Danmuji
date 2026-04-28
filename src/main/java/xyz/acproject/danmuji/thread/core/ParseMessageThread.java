@@ -65,6 +65,9 @@ public class ParseMessageThread extends Thread {
     private HashSet<ThankGiftRuleSet> thankGiftRuleSets;
     private CenterSetConf centerSetConf;
     private static final Pattern MONTH_BLIND_BOX_COMMAND = Pattern.compile("^([1-9]|1[0-2])月盲盒$");
+    /** 中文月份须长词优先（十一、十二、十），避免歧义 */
+    private static final Pattern MONTH_BLIND_BOX_COMMAND_CN = Pattern.compile(
+            "^(十二月|十一月|十月|九月|八月|七月|六月|五月|四月|三月|二月|一月)盲盒$");
 
 
     @Override
@@ -1618,7 +1621,14 @@ public class ParseMessageThread extends Thread {
         String msg = barrage.getMsg().trim();
         boolean isRollingThreeMonth = StringUtils.equals("近3月盲盒", msg);
         Matcher monthMatcher = MONTH_BLIND_BOX_COMMAND.matcher(msg);
-        boolean isMonthCommand = monthMatcher.matches();
+        Matcher monthCnMatcher = MONTH_BLIND_BOX_COMMAND_CN.matcher(msg);
+        Integer monthNum = null;
+        if (monthMatcher.matches()) {
+            monthNum = Integer.parseInt(monthMatcher.group(1));
+        } else if (monthCnMatcher.matches()) {
+            monthNum = chineseMonthBlindLabelToMonth(monthCnMatcher.group(1));
+        }
+        boolean isMonthCommand = monthNum != null;
         if (!isRollingThreeMonth && !isMonthCommand) {
             return;
         }
@@ -1638,7 +1648,7 @@ public class ParseMessageThread extends Thread {
                         + "个盲盒，" + profitText(userSummary.getTotalProfitCoin()) + "。";
             }
         } else {
-            int month = Integer.parseInt(monthMatcher.group(1));
+            int month = monthNum;
             int year = Calendar.getInstance().get(Calendar.YEAR);
             if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
                 BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomByMonth(PublicDataConf.ROOMID, year, month);
@@ -1653,6 +1663,40 @@ public class ParseMessageThread extends Thread {
         PublicDataConf.barrageString.add(reply);
         synchronized (PublicDataConf.sendBarrageThread) {
             PublicDataConf.sendBarrageThread.notify();
+        }
+    }
+
+    /**
+     * 弹幕「一月盲盒」～「十二月盲盒」前缀转月份数字
+     */
+    private static int chineseMonthBlindLabelToMonth(String label) {
+        switch (label) {
+            case "一月":
+                return 1;
+            case "二月":
+                return 2;
+            case "三月":
+                return 3;
+            case "四月":
+                return 4;
+            case "五月":
+                return 5;
+            case "六月":
+                return 6;
+            case "七月":
+                return 7;
+            case "八月":
+                return 8;
+            case "九月":
+                return 9;
+            case "十月":
+                return 10;
+            case "十一月":
+                return 11;
+            case "十二月":
+                return 12;
+            default:
+                throw new IllegalStateException("unexpected month label: " + label);
         }
     }
 
