@@ -40,6 +40,99 @@ public class HttpRoomData {
 	private static Logger LOGGER = LogManager.getLogger(HttpRoomData.class);
 
 	/**
+	 * 获取指定房间舰长数量（舰队人数）
+	 */
+	public static int httpGetGuardListTotalSize(long roomId, long ruid) {
+		String data = null;
+		Map<String, String> headers = null;
+		Map<String, String> datas = null;
+		int num = 0;
+		JSONObject jsonObject = null;
+		short code = -1;
+		headers = new HashMap<>(3);
+		headers.put("referer", "https://live.bilibili.com/" + roomId);
+		headers.put("user-agent",
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36");
+		datas = new HashMap<>(5);
+		datas.put("roomid", String.valueOf(roomId));
+		datas.put("page", String.valueOf(1));
+		datas.put("ruid", String.valueOf(ruid));
+		datas.put("page_size", "29");
+		try {
+			data = OkHttp3Utils.getHttp3Utils()
+					.httpGet("https://api.live.bilibili.com/xlive/app-room/v1/guardTab/topList", headers, datas).body()
+					.string();
+		} catch (Exception e) {
+			LOGGER.error(e);
+			data = null;
+		}
+		if (data == null) {
+			return num;
+		}
+		jsonObject = JSONObject.parseObject(data);
+		code = jsonObject.getShort("code");
+		if (code == 0) {
+			num = ((JSONObject) ((JSONObject) jsonObject.get("data")).get("info")).getInteger("num");
+		} else {
+			LOGGER.error("获取舰长数失败,原因:" + jsonObject.getString("message"));
+		}
+		return num;
+	}
+
+	/**
+	 * 获取指定房间在线榜（高能榜）摘要：在线人数与榜一投喂值（score）
+	 *
+	 * @return data对象，失败返回null
+	 */
+	public static JSONObject httpGetOnlineGoldRankData(long roomId, long ruid) {
+		String data = null;
+		JSONObject jsonObject = null;
+		short code = -1;
+		Map<String, String> headers = null;
+		Map<String, String> datas = null;
+		headers = new HashMap<>(3);
+		headers.put("referer", "https://live.bilibili.com/" + roomId);
+		headers.put("user-agent",
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36");
+		datas = new HashMap<>(4);
+		datas.put("roomId", String.valueOf(roomId));
+		datas.put("ruid", String.valueOf(ruid));
+		datas.put("page", "1");
+		datas.put("pageSize", "50");
+		try {
+			data = OkHttp3Utils.getHttp3Utils()
+					.httpGet("https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank", headers, datas)
+					.body().string();
+		} catch (Exception e) {
+			LOGGER.error(e);
+			data = null;
+		}
+		if (data == null) {
+			return null;
+		}
+		jsonObject = JSONObject.parseObject(data);
+		code = jsonObject.getShort("code");
+		if (code == 0) {
+			return jsonObject.getJSONObject("data");
+		}
+		LOGGER.error("获取在线榜失败,原因:" + jsonObject.getString("message"));
+		return null;
+	}
+
+	public static Long httpGetOnlineGoldRankOnlineNum(long roomId, long ruid) {
+		JSONObject data = httpGetOnlineGoldRankData(roomId, ruid);
+		return data == null ? null : data.getLong("onlineNum");
+	}
+
+	public static Long httpGetOnlineGoldRankTopScore(long roomId, long ruid) {
+		JSONObject data = httpGetOnlineGoldRankData(roomId, ruid);
+		if (data == null) return null;
+		JSONArray items = data.getJSONArray("OnlineRankItem");
+		if (items == null || items.isEmpty()) return null;
+		return items.getJSONObject(0).getLong("score");
+	}
+
+	/**
 	 * 获取连接目标房间websocket端口 接口
 	 *
 	 * @return

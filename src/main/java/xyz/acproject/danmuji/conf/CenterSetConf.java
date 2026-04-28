@@ -52,6 +52,9 @@ public class CenterSetConf implements Serializable {
     //是否屏蔽非当前房间勋章弹幕
     @JSONField(name = "is_barrage_anchor_shield")
     private boolean is_barrage_anchor_shield = false;
+    // PK连线时是否在本房间发送对方房间信息弹幕
+    @JSONField(name = "is_pk_info_barrage")
+    private boolean is_pk_info_barrage = false;
     //信息是否显示房管禁言消息
     @JSONField(name = "is_block")
     private boolean is_block = true;

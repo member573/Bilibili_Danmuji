@@ -55,6 +55,8 @@ public class PublicDataConf {
 	public static Long ROOM_WATCHER = 0L;
 	//点赞数量
 	public static Long ROOM_LIKE = 0L;
+	// 最近一次PK连线ID（用于去重）
+	public static volatile Long LAST_PK_ID = null;
 	//直播状态 0不直播 1直播 2轮播
 	public static Short lIVE_STATUS = 0;
 	//cookie String串

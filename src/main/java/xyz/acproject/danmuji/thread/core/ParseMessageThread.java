@@ -28,6 +28,7 @@ import xyz.acproject.danmuji.entity.superchat.MedalInfo;
 import xyz.acproject.danmuji.entity.superchat.SuperChat;
 import xyz.acproject.danmuji.enums.ListPeopleShieldStatus;
 import xyz.acproject.danmuji.enums.ShieldGift;
+import xyz.acproject.danmuji.http.HttpRoomData;
 import xyz.acproject.danmuji.http.HttpUserData;
 import xyz.acproject.danmuji.service.BlindBoxRecordService;
 import xyz.acproject.danmuji.service.SetService;
@@ -920,7 +921,7 @@ public class ParseMessageThread extends Thread {
 
                         // pk开始
                         case "PK_START":
-                            //					LOGGER.info("房间pk开始:::" + message);
+                            handlePkLink(jsonObject, message);
                             break;
 
                         // pk准备中
@@ -930,7 +931,7 @@ public class ParseMessageThread extends Thread {
 
                         // pk载入中
                         case "PK_MATCH":
-                            //					LOGGER.info("房间pk载入中:::" + message);
+                            handlePkLink(jsonObject, message);
                             break;
 
                         // pk再来一次触发
@@ -954,7 +955,7 @@ public class ParseMessageThread extends Thread {
 
                         // pk结束信息推送
                         case "PK_END":
-                            //					LOGGER.info("房间pk结束信息推送:::" + message);
+                            PublicDataConf.LAST_PK_ID = null;
                             break;
 
                         // 系统信息推送
@@ -1686,6 +1687,151 @@ public class ParseMessageThread extends Thread {
         synchronized (PublicDataConf.sendBarrageThread) {
             PublicDataConf.sendBarrageThread.notify();
         }
+    }
+
+    private void handlePkLink(JSONObject root, String rawMessage) {
+        if (root == null) return;
+        if (getCenterSetConf() == null || !getCenterSetConf().is_pk_info_barrage()) {
+            return;
+        }
+        // 仅在可发送弹幕时执行（避免阻塞解析线程的意义不大）
+        if (PublicDataConf.sendBarrageThread == null || PublicDataConf.sendBarrageThread.FLAG) {
+            return;
+        }
+        try {
+            JSONObject data = root.getJSONObject("data");
+            if (data == null && StringUtils.isNotBlank(root.getString("data"))) {
+                data = JSONObject.parseObject(root.getString("data"));
+            }
+            if (data == null) return;
+
+            Long pkId = firstLong(data,
+                    "pk_id", "pkId", "id", "battle_id", "battleId");
+            if (pkId != null && pkId.equals(PublicDataConf.LAST_PK_ID)) {
+                return;
+            }
+
+            Long otherRoomId = firstLongByPath(data,
+                    "other_room_id",
+                    "other_roomid",
+                    "match_info.other_room_id",
+                    "match_info.other_roomid",
+                    "match_info.room_id",
+                    "pk_room_id",
+                    "pk_roomid",
+                    "pk_room_id_str");
+            Long otherUid = firstLongByPath(data,
+                    "other_uid",
+                    "other_ruid",
+                    "other_ru_id",
+                    "match_info.other_uid",
+                    "match_info.uid",
+                    "pk_uid",
+                    "pkruid",
+                    "ruid");
+            String otherName = firstStringByPath(data,
+                    "other_name",
+                    "other_uname",
+                    "match_info.other_name",
+                    "match_info.uname",
+                    "pk_name");
+
+            if (otherRoomId == null || otherUid == null) {
+                // 字段结构可能随B站变化；不影响主流程
+                return;
+            }
+
+            if (pkId != null) {
+                PublicDataConf.LAST_PK_ID = pkId;
+            }
+
+            int guardNum = HttpRoomData.httpGetGuardListTotalSize(otherRoomId, otherUid);
+            Long onlineNum = HttpRoomData.httpGetOnlineGoldRankOnlineNum(otherRoomId, otherUid);
+            Long topScore = HttpRoomData.httpGetOnlineGoldRankTopScore(otherRoomId, otherUid);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("PK连线 对方房间").append(otherRoomId);
+            if (StringUtils.isNotBlank(otherName)) {
+                sb.append("（").append(otherName).append("）");
+            }
+            sb.append(" 舰长数").append(guardNum);
+            sb.append(" 在线人数").append(onlineNum == null ? "-" : onlineNum);
+            sb.append(" 在线榜榜一投喂值").append(topScore == null ? "-" : topScore);
+            sb.append("。");
+
+            PublicDataConf.barrageString.add(sb.toString());
+            synchronized (PublicDataConf.sendBarrageThread) {
+                PublicDataConf.sendBarrageThread.notify();
+            }
+        } catch (Exception e) {
+            LOGGER.error("PK连线信息处理失败:{}", rawMessage, e);
+        }
+    }
+
+    private static Long firstLong(JSONObject obj, String... keys) {
+        if (obj == null || keys == null) return null;
+        for (String k : keys) {
+            if (StringUtils.isBlank(k)) continue;
+            Long v = obj.getLong(k);
+            if (v != null) return v;
+            // 兼容字符串数字
+            String s = obj.getString(k);
+            if (StringUtils.isNotBlank(s) && StringUtils.isNumeric(s)) {
+                try {
+                    return Long.parseLong(s);
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Long firstLongByPath(JSONObject obj, String... paths) {
+        if (obj == null || paths == null) return null;
+        for (String p : paths) {
+            if (StringUtils.isBlank(p)) continue;
+            Object cur = obj;
+            String[] parts = p.split("\\.");
+            for (String part : parts) {
+                if (!(cur instanceof JSONObject)) {
+                    cur = null;
+                    break;
+                }
+                cur = ((JSONObject) cur).get(part);
+            }
+            if (cur == null) continue;
+            if (cur instanceof Number) {
+                return ((Number) cur).longValue();
+            }
+            if (cur instanceof String && StringUtils.isNumeric((String) cur)) {
+                try {
+                    return Long.parseLong((String) cur);
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String firstStringByPath(JSONObject obj, String... paths) {
+        if (obj == null || paths == null) return null;
+        for (String p : paths) {
+            if (StringUtils.isBlank(p)) continue;
+            Object cur = obj;
+            String[] parts = p.split("\\.");
+            for (String part : parts) {
+                if (!(cur instanceof JSONObject)) {
+                    cur = null;
+                    break;
+                }
+                cur = ((JSONObject) cur).get(part);
+            }
+            if (cur == null) continue;
+            if (cur instanceof String && StringUtils.isNotBlank((String) cur)) {
+                return (String) cur;
+            }
+        }
+        return null;
     }
 
     /**
