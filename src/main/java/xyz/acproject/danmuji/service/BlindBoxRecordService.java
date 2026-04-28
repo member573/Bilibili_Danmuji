@@ -194,6 +194,26 @@ public class BlindBoxRecordService {
         return summary;
     }
 
+    public BlindBoxProfitSummary queryUserToday(Long uid, Long roomId) {
+        long[] range = getTodayRange();
+        return queryUserByRange(uid, roomId, range[0], range[1]);
+    }
+
+    public BlindBoxProfitSummary queryRoomToday(Long roomId) {
+        long[] range = getTodayRange();
+        return queryRoomByRange(roomId, range[0], range[1]);
+    }
+
+    public BlindBoxProfitSummary queryUserThisWeek(Long uid, Long roomId) {
+        long[] range = getThisWeekRange();
+        return queryUserByRange(uid, roomId, range[0], range[1]);
+    }
+
+    public BlindBoxProfitSummary queryRoomThisWeek(Long roomId) {
+        long[] range = getThisWeekRange();
+        return queryRoomByRange(roomId, range[0], range[1]);
+    }
+
     public BlindBoxProfitSummary queryUserByMonth(Long uid, Long roomId, int year, int month) {
         BlindBoxProfitSummary summary = new BlindBoxProfitSummary();
         summary.setUid(uid);
@@ -269,6 +289,69 @@ public class BlindBoxRecordService {
         summary.setFromTimestamp(now - THREE_MONTHS_MS);
     }
 
+    private BlindBoxProfitSummary queryUserByRange(Long uid, Long roomId, long fromTimestamp, long toTimestamp) {
+        BlindBoxProfitSummary summary = new BlindBoxProfitSummary();
+        summary.setUid(uid);
+        summary.setRoomId(roomId);
+        summary.setFromTimestamp(fromTimestamp);
+        summary.setToTimestamp(toTimestamp);
+        if (uid == null || uid <= 0) {
+            return summary;
+        }
+        String sql = "SELECT COUNT(1) total_count, COALESCE(SUM(cost_coin),0) total_cost, " +
+                "COALESCE(SUM(reward_coin),0) total_reward, COALESCE(SUM(profit_coin),0) total_profit " +
+                "FROM blind_box_record WHERE sender_uid=? AND event_time>=? AND event_time<?" +
+                (roomId != null && roomId > 0 ? " AND room_id=?" : "");
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, uid);
+            ps.setLong(2, summary.getFromTimestamp());
+            ps.setLong(3, summary.getToTimestamp());
+            if (roomId != null && roomId > 0) {
+                ps.setLong(4, roomId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    summary.setTotalCount(rs.getLong("total_count"));
+                    summary.setTotalCostCoin(rs.getLong("total_cost"));
+                    summary.setTotalRewardCoin(rs.getLong("total_reward"));
+                    summary.setTotalProfitCoin(rs.getLong("total_profit"));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("查询用户盲盒区间统计失败 uid={}, roomId={}, from={}, to={}", uid, roomId, fromTimestamp, toTimestamp, e);
+        }
+        return summary;
+    }
+
+    private BlindBoxProfitSummary queryRoomByRange(Long roomId, long fromTimestamp, long toTimestamp) {
+        BlindBoxProfitSummary summary = new BlindBoxProfitSummary();
+        summary.setRoomId(roomId);
+        summary.setFromTimestamp(fromTimestamp);
+        summary.setToTimestamp(toTimestamp);
+        if (roomId == null || roomId <= 0) {
+            return summary;
+        }
+        String sql = "SELECT COUNT(1) total_count, COALESCE(SUM(cost_coin),0) total_cost, " +
+                "COALESCE(SUM(reward_coin),0) total_reward, COALESCE(SUM(profit_coin),0) total_profit " +
+                "FROM blind_box_record WHERE room_id=? AND event_time>=? AND event_time<?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, roomId);
+            ps.setLong(2, summary.getFromTimestamp());
+            ps.setLong(3, summary.getToTimestamp());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    summary.setTotalCount(rs.getLong("total_count"));
+                    summary.setTotalCostCoin(rs.getLong("total_cost"));
+                    summary.setTotalRewardCoin(rs.getLong("total_reward"));
+                    summary.setTotalProfitCoin(rs.getLong("total_profit"));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("查询房间盲盒区间统计失败 roomId={}, from={}, to={}", roomId, fromTimestamp, toTimestamp, e);
+        }
+        return summary;
+    }
+
     private long[] getMonthRange(int year, int month) {
         Calendar start = Calendar.getInstance();
         start.set(Calendar.YEAR, year);
@@ -280,6 +363,30 @@ public class BlindBoxRecordService {
         start.set(Calendar.MILLISECOND, 0);
         Calendar end = (Calendar) start.clone();
         end.add(Calendar.MONTH, 1);
+        return new long[]{start.getTimeInMillis(), end.getTimeInMillis()};
+    }
+
+    private long[] getTodayRange() {
+        Calendar start = Calendar.getInstance();
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        Calendar end = (Calendar) start.clone();
+        end.add(Calendar.DAY_OF_MONTH, 1);
+        return new long[]{start.getTimeInMillis(), end.getTimeInMillis()};
+    }
+
+    private long[] getThisWeekRange() {
+        Calendar start = Calendar.getInstance();
+        start.setFirstDayOfWeek(Calendar.MONDAY);
+        start.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        Calendar end = (Calendar) start.clone();
+        end.add(Calendar.DAY_OF_MONTH, 7);
         return new long[]{start.getTimeInMillis(), end.getTimeInMillis()};
     }
 

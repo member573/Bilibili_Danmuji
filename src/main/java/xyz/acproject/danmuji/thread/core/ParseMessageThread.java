@@ -1619,6 +1619,8 @@ public class ParseMessageThread extends Thread {
             return;
         }
         String msg = barrage.getMsg().trim();
+        boolean isTodayCommand = StringUtils.equals("今日盲盒", msg);
+        boolean isWeekCommand = StringUtils.equals("本周盲盒", msg);
         boolean isRollingThreeMonth = StringUtils.equals("近3月盲盒", msg);
         Matcher monthMatcher = MONTH_BLIND_BOX_COMMAND.matcher(msg);
         Matcher monthCnMatcher = MONTH_BLIND_BOX_COMMAND_CN.matcher(msg);
@@ -1629,7 +1631,7 @@ public class ParseMessageThread extends Thread {
             monthNum = chineseMonthBlindLabelToMonth(monthCnMatcher.group(1));
         }
         boolean isMonthCommand = monthNum != null;
-        if (!isRollingThreeMonth && !isMonthCommand) {
+        if (!isTodayCommand && !isWeekCommand && !isRollingThreeMonth && !isMonthCommand) {
             return;
         }
         if (PublicDataConf.sendBarrageThread == null || PublicDataConf.sendBarrageThread.FLAG) {
@@ -1637,7 +1639,27 @@ public class ParseMessageThread extends Thread {
         }
 
         String reply;
-        if (isRollingThreeMonth) {
+        if (isTodayCommand) {
+            if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
+                BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomToday(PublicDataConf.ROOMID);
+                reply = "今日盲盒 共投喂" + safeCount(roomSummary)
+                        + "个盲盒，" + profitText(roomSummary.getTotalProfitCoin()) + "。";
+            } else {
+                BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserToday(barrage.getUid(), PublicDataConf.ROOMID);
+                reply = "@" + barrage.getUname() + " 今日盲盒 共投喂" + safeCount(userSummary)
+                        + "个盲盒，" + profitText(userSummary.getTotalProfitCoin()) + "。";
+            }
+        } else if (isWeekCommand) {
+            if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
+                BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomThisWeek(PublicDataConf.ROOMID);
+                reply = "本周盲盒 共投喂" + safeCount(roomSummary)
+                        + "个盲盒，" + profitText(roomSummary.getTotalProfitCoin()) + "。";
+            } else {
+                BlindBoxProfitSummary userSummary = blindBoxRecordService.queryUserThisWeek(barrage.getUid(), PublicDataConf.ROOMID);
+                reply = "@" + barrage.getUname() + " 本周盲盒 共投喂" + safeCount(userSummary)
+                        + "个盲盒，" + profitText(userSummary.getTotalProfitCoin()) + "。";
+            }
+        } else if (isRollingThreeMonth) {
             if (PublicDataConf.AUID != null && PublicDataConf.AUID.equals(barrage.getUid())) {
                 BlindBoxProfitSummary roomSummary = blindBoxRecordService.queryRoomLastThreeMonths(PublicDataConf.ROOMID);
                 reply = "近3月盲盒 共投喂" + safeCount(roomSummary)
